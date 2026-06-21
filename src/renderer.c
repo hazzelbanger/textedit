@@ -220,8 +220,10 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
         if (draw_y > ren->buf_height) break;
 
         _snprintf(num_buf, sizeof(num_buf), "%d", line + 1);
+        // Calculate the x position to right-align the line number within the line number area. We take the width of the line number text and subtract it from the total line number area width, then add a small padding (10 pixels) to keep it away from the edge.
         int num_x = line_num_width - 10 - (int)strlen(num_buf) * (ren->ft_face->size->metrics.max_advance >> 6);
 
+        // Save the current text color, set it to the line number color, draw the line number, and then restore the original text color. This ensures that the line numbers are drawn in a different color than the main text, improving readability.
         COLORREF old_text = ren->text_color;
         ren->text_color = ren->line_number_color;
         for (int c = 0; num_buf[c]; c++) {
@@ -235,7 +237,7 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
     }
 }
 
-// This function is responsible for rendering the entire text buffer onto the pixel buffer. It first fills the background, then draws line numbers, and finally renders each character in the text buffer using the cached glyphs. It also handles drawing the cursor at the correct position. After rendering, it updates the window with the new pixel buffer content.
+// This function performs hit testing to determine which character position corresponds to the given mouse coordinates. It calculates the line and column based on the mouse position and the current scroll offset, then converts that to a character index in the text buffer. This allows the editor to move the cursor or update the selection based on where the user clicks or drags the mouse.
 size_t renderer_hit_test(Renderer *ren, TextBuffer *tb, int mouse_x, int mouse_y) {
     int line_num_width = 60;
     int advance = ren->ft_face->size->metrics.max_advance >> 6;
@@ -256,6 +258,7 @@ size_t renderer_hit_test(Renderer *ren, TextBuffer *tb, int mouse_x, int mouse_y
     return tb_pos_from_line_col(tb, target_line, target_col);
 }
 
+// This function draws the selection highlight for the selected text range. It calculates the pixel coordinates for the selection based on the line and column of the selected text, and fills a rectangle with the selection color. The function handles multi-line selections and ensures that the selection highlight is only drawn within the visible area of the editor.
 static void renderer_draw_selection(Renderer *ren, TextBuffer *tb) {
     if (!tb_has_selection(tb)) return;
 
@@ -296,7 +299,9 @@ static void renderer_draw_selection(Renderer *ren, TextBuffer *tb) {
     }
 }
 
+// This is the main rendering function that draws the entire text buffer onto the pixel buffer. It first fills the background, then draws line numbers and selection highlights. It iterates through each character in the text buffer, retrieves the corresponding glyph, and blends it onto the pixel buffer at the correct position. Finally, it uses Windows API to blit the pixel buffer onto the window's device context.
 void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
+    
     COLORREF bg = ren->bg_color;
     for (int i = 0; i < ren->buf_width * ren->buf_height * 4; i += 4) {
         ren->pixel_buf[i + 0] = GetBValue(bg);

@@ -6,17 +6,18 @@
 
 #define TB_INITIAL_CAP 4096
 
+// TextBuffer is a dynamic text buffer that supports basic text editing operations, cursor movement, and selection. It maintains the text data, cursor position, selection state, and scroll offsets for rendering. The API provides functions for inserting and deleting characters, moving the cursor in various directions, managing text selection, and converting between line/column and character positions.
 typedef struct {
     char *data;
     size_t len;
     size_t cap;
 
-    size_t cursor;
-    size_t selection_anchor;
-    int has_selection;
+    size_t cursor; // Current cursor position (character index)
+    size_t selection_anchor; // The position where the selection started
+    int has_selection; // Whether there is an active selection
 
-    int scroll_x;
-    int scroll_y;
+    int scroll_x; // Horizontal scroll offset in pixels
+    int scroll_y; // Vertical scroll offset in pixels
 } TextBuffer;
 
 void tb_init(TextBuffer *tb);

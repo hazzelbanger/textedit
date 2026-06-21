@@ -72,6 +72,7 @@ void tb_select_all(TextBuffer *tb) {
     tb->has_selection = 1;
 }
 
+// This function converts a given line and column number to a character index in the text buffer. It iterates through the text buffer to find the start of the specified line, then adds the column offset to determine the final character position. This is useful for hit testing and cursor movement based on line and column coordinates.
 size_t tb_pos_from_line_col(TextBuffer *tb, size_t line, size_t col) {
     size_t current_line = 0;
     size_t pos = 0;
@@ -127,6 +128,7 @@ void tb_move_cursor_right(TextBuffer *tb) {
     if (tb->cursor < tb->len) tb->cursor++;
 }
 
+// The following functions handle vertical cursor movement (up and down) and moving to the beginning or end of the line. They calculate the new cursor position based on the current line and column, ensuring that the cursor stays within valid bounds of the text buffer.
 void tb_move_cursor_up(TextBuffer *tb) {
     size_t line_start = tb_get_line_start(tb, tb->cursor);
     if (line_start == 0) {
@@ -159,6 +161,7 @@ void tb_move_cursor_end(TextBuffer *tb) {
     tb->cursor = tb_get_line_end(tb, tb->cursor);
 }
 
+// The following functions calculate the start and end positions of a line based on a given character index. They are used for various cursor movement and selection operations to determine the boundaries of lines in the text buffer.
 size_t tb_get_line_start(TextBuffer *tb, size_t pos) {
     if (pos > tb->len) pos = tb->len;
     while (pos > 0 && tb->data[pos - 1] != '\n') pos--;

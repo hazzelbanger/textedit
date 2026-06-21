@@ -132,6 +132,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         InvalidateRect(hwnd, NULL, FALSE);
         return 0;
 
+    // This case handles the WM_PAINT message, which is sent when the window needs to be redrawn. It begins the paint operation, calls the renderer to draw the text buffer onto the window's device context, and then ends the paint operation. The renderer will use the current state of the text buffer, including cursor position and selection, to render the editor's content.
     case WM_PAINT: {
         PAINTSTRUCT ps;
         BeginPaint(hwnd, &ps);
@@ -294,6 +295,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         return 0;
     }
 
+    // This case handles mouse movement while the left button is held down for text selection. It performs hit testing to determine the character position under the mouse cursor and updates the text buffer's cursor and selection state accordingly. The editor is then invalidated to trigger a redraw with the updated selection.
     case WM_MOUSEMOVE: {
         if (!g_mouse_selecting) return 0;
         int mx = GET_X_LPARAM(lparam);
