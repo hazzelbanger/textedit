@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <windowsx.h>
 #include <stdio.h>
 #include "text_buffer.h"
 #include "renderer.h"
@@ -12,7 +13,6 @@ static int g_cursor_blink = 1;
 static UINT_PTR g_timer_id = 1;
 static int g_font_size = 16;
 static char g_font_path[MAX_PATH] = "C:\\Windows\\Fonts\\consola.ttf";
-static int g_line_num_width = 60;
 static int g_mouse_selecting = 0;
 
 static void app_init(void) {
@@ -36,7 +36,7 @@ static void app_open_file(const char *path) {
     tb_free(&g_buffer);
     tb_init(&g_buffer);
     if (size > 0) {
-        g_buffer.len = (size_t)size;
+        g_buffer.len = (int)size;
         while (g_buffer.len + 1 >= g_buffer.cap) {
             g_buffer.cap *= 2;
         }
@@ -56,10 +56,10 @@ static void app_save_file(const char *path) {
     fclose(f);
 }
 
-static void app_update_scroll(TextBuffer *tb, int client_height) {
-    size_t cur_line = tb_get_line_number(tb, tb->cursor);
+static void app_update_scroll(TextBuffer *tb, int client_width, int client_height) {
+    int cur_line = tb_get_line_number(tb, tb->cursor);
     int cursor_y = (int)cur_line * g_renderer.line_height;
-    int cursor_x = (int)tb_get_line_col(tb, tb->cursor) * (g_renderer.ft_face->size->metrics.max_advance >> 6) + g_line_num_width;
+    int cursor_x = (int)tb_get_line_col(tb, tb->cursor) * (g_renderer.ft_face->size->metrics.max_advance >> 6) + g_renderer.text_area_left;
 
     if (cursor_y - tb->scroll_y < 0) {
         tb->scroll_y = cursor_y;
@@ -67,18 +67,18 @@ static void app_update_scroll(TextBuffer *tb, int client_height) {
         tb->scroll_y = cursor_y + g_renderer.line_height - client_height;
     }
 
-    if (cursor_x - tb->scroll_x < g_line_num_width) {
-        tb->scroll_x = cursor_x - g_line_num_width;
-    } else if (cursor_x + 40 - tb->scroll_x > client_height ? 800 : client_height) {
-        tb->scroll_x = cursor_x + 40 - (client_height > 0 ? client_height : 800);
+    if (cursor_x - tb->scroll_x < g_renderer.text_area_left) {
+        tb->scroll_x = cursor_x - g_renderer.text_area_left;
+    } else if (cursor_x + 40 - tb->scroll_x > client_width) {
+        tb->scroll_x = cursor_x + 40 - client_width;
     }
 }
 
 static void app_copy_selection(HWND hwnd) {
     if (!tb_has_selection(&g_buffer)) return;
-    size_t sel_start, sel_end;
+    int sel_start, sel_end;
     tb_get_selection_range(&g_buffer, &sel_start, &sel_end);
-    size_t len = sel_end - sel_start;
+    int len = sel_end - sel_start;
     HGLOBAL hmem = GlobalAlloc(GMEM_MOVEABLE, len + 1);
     if (!hmem) return;
     char *ptr = (char *)GlobalLock(hmem);
@@ -253,7 +253,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         SetTimer(hwnd, g_timer_id, 500, NULL);
         RECT rc;
         GetClientRect(hwnd, &rc);
-        app_update_scroll(&g_buffer, rc.bottom);
+        app_update_scroll(&g_buffer, rc.right, rc.bottom);
         InvalidateRect(hwnd, NULL, FALSE);
         return 0;
     }
@@ -274,7 +274,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         SetTimer(hwnd, g_timer_id, 500, NULL);
         RECT rc;
         GetClientRect(hwnd, &rc);
-        app_update_scroll(&g_buffer, rc.bottom);
+        app_update_scroll(&g_buffer, rc.right, rc.bottom);
         InvalidateRect(hwnd, NULL, FALSE);
         return 0;
     }
@@ -300,7 +300,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         if (!g_mouse_selecting) return 0;
         int mx = GET_X_LPARAM(lparam);
         int my = GET_Y_LPARAM(lparam);
-        size_t pos = renderer_hit_test(&g_renderer, &g_buffer, mx, my);
+        int pos = renderer_hit_test(&g_renderer, &g_buffer, mx, my);
         g_buffer.cursor = pos;
         g_buffer.has_selection = (pos != g_buffer.selection_anchor) ? 1 : 0;
         InvalidateRect(hwnd, NULL, FALSE);

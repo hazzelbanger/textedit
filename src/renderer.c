@@ -1,6 +1,8 @@
 #include "renderer.h"
+#include "debug.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 static void renderer_blend_glyph(Renderer *ren, GlyphInfo *glyph, int x, int y);
 static GlyphInfo *renderer_get_glyph(Renderer *ren, unsigned long charcode);
@@ -17,8 +19,9 @@ int renderer_init(Renderer *ren, const char *font_path, int font_size) {
     ren->cursor_color = RGB(0xFF, 0xFF, 0xFF);
     ren->selection_color = RGB(0x40, 0x40, 0x70);
     ren->selection_text_color = RGB(0xFF, 0xFF, 0xFF);
-    ren->line_number_color = RGB(0x80, 0x80, 0x80);
+    ren->line_number_color = RGB(0xFF, 0xFF, 0xFF); //RGB(0x80, 0x80, 0x80);
     ren->line_number_bg = RGB(0x25, 0x25, 0x35);
+    ren->text_area_left = 60;
 
     FT_Error err = FT_Init_FreeType(&ren->ft_lib);
     if (err) return -1;
@@ -144,13 +147,13 @@ static void renderer_blend_glyph(Renderer *ren, GlyphInfo *glyph, int x, int y) 
     int surf_y = y - glyph->bearing_y + ren->ascender;
     int gw = glyph->width;
     int gh = glyph->height;
-
+    MyDebugOutput(L"Blending glyph at x=%d, y=%d (surf_x=%d, surf_y=%d, gw=%d, gh=%d)\n", x, y, surf_x, surf_y, gw, gh);
     for (int gy = 0; gy < gh; gy++) {
         int py = surf_y + gy;
         if (py < 0 || py >= ren->buf_height) continue;
         for (int gx = 0; gx < gw; gx++) {
             int px = surf_x + gx;
-            if (px < 0 || px >= ren->buf_width) continue;
+            if (px < ren->text_area_left || px >= ren->buf_width) continue;
 
             unsigned char a = glyph->bitmap[gy * gw + gx];
             if (a == 0) continue;
@@ -189,29 +192,29 @@ static void renderer_fill_rect(Renderer *ren, int x, int y, int w, int h, COLORR
 }
 
 static void renderer_draw_cursor(Renderer *ren, TextBuffer *tb) {
-    size_t line = tb_get_line_number(tb, tb->cursor);
-    size_t col = tb_get_line_col(tb, tb->cursor);
+    int line = tb_get_line_number(tb, tb->cursor);
+    int col = tb_get_line_col(tb, tb->cursor);
 
-    int line_num_width = 60;
-    int x = col * (ren->ft_face->size->metrics.max_advance >> 6) + line_num_width - tb->scroll_x;
+    int x = col * (ren->ft_face->size->metrics.max_advance >> 6) + ren->text_area_left - tb->scroll_x;
     int y = (int)line * ren->line_height - tb->scroll_y;
 
-    if (x >= line_num_width && x < ren->buf_width && y >= 0 && y < ren->buf_height) {
+    if (x >= ren->text_area_left && x < ren->buf_width && y >= 0 && y < ren->buf_height) {
         renderer_fill_rect(ren, x, y, 2, ren->line_height, ren->cursor_color);
     }
 }
 
 // This function is responsible for drawing the line numbers on the left side of the editor. It calculates the total number of lines in the text buffer, fills the background for the line number area, and then renders each line number using the cached glyphs. The line numbers are right-aligned within the line number area, and their color is set to a different color than the main text for better visibility.
 static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
-    int line_num_width = 60;
+    int line_num_width = ren->text_area_left;
+    int advance = ren->ft_face->size->metrics.max_advance >> 6;
     int total_lines = 1;
-    for (size_t i = 0; i < tb->len; i++) {
+    for (int i = 0; i < tb->len; i++) {
         if (tb->data[i] == '\n') total_lines++;
     }
 
     renderer_fill_rect(ren, 0, 0, line_num_width, ren->buf_height, ren->line_number_bg);
 
-    size_t cur_line = 0;
+    int cur_line = 0;
     int y = -tb->scroll_y;
     char num_buf[16];
     for (int line = 0; line < total_lines; line++) {
@@ -221,7 +224,7 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
 
         _snprintf(num_buf, sizeof(num_buf), "%d", line + 1);
         // Calculate the x position to right-align the line number within the line number area. We take the width of the line number text and subtract it from the total line number area width, then add a small padding (10 pixels) to keep it away from the edge.
-        int num_x = line_num_width - 10 - (int)strlen(num_buf) * (ren->ft_face->size->metrics.max_advance >> 6);
+        int num_x = ren->text_area_left - 8 - (int)strlen(num_buf) * advance;
 
         // Save the current text color, set it to the line number color, draw the line number, and then restore the original text color. This ensures that the line numbers are drawn in a different color than the main text, improving readability.
         COLORREF old_text = ren->text_color;
@@ -230,6 +233,7 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
             GlyphInfo *glyph = renderer_get_glyph(ren, (unsigned long)num_buf[c]);
             if (glyph) {
                 renderer_blend_glyph(ren, glyph, num_x, draw_y);
+                MyDebugOutput(L"Drawing line number '%c' at x=%d, y=%d\n", num_buf[c], num_x, draw_y);
                 num_x += glyph->advance;
             }
         }
@@ -238,19 +242,19 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
 }
 
 // This function performs hit testing to determine which character position corresponds to the given mouse coordinates. It calculates the line and column based on the mouse position and the current scroll offset, then converts that to a character index in the text buffer. This allows the editor to move the cursor or update the selection based on where the user clicks or drags the mouse.
-size_t renderer_hit_test(Renderer *ren, TextBuffer *tb, int mouse_x, int mouse_y) {
-    int line_num_width = 60;
+int renderer_hit_test(Renderer *ren, TextBuffer *tb, int mouse_x, int mouse_y) {
+    int line_num_width = ren->text_area_left;
     int advance = ren->ft_face->size->metrics.max_advance >> 6;
     int adjusted_x = mouse_x + tb->scroll_x;
     int adjusted_y = mouse_y + tb->scroll_y;
 
     if (adjusted_x < line_num_width) adjusted_x = line_num_width;
 
-    size_t target_line = (size_t)(adjusted_y / ren->line_height);
-    size_t target_col = (size_t)((adjusted_x - line_num_width) / (advance > 0 ? advance : 1));
+    int target_line = (int)(adjusted_y / ren->line_height);
+    int target_col = (int)((adjusted_x - line_num_width) / (advance > 0 ? advance : 1));
 
-    size_t total_lines = 1;
-    for (size_t i = 0; i < tb->len; i++) {
+    int total_lines = 1;
+    for (int i = 0; i < tb->len; i++) {
         if (tb->data[i] == '\n') total_lines++;
     }
     if (target_line >= total_lines) return tb->len;
@@ -262,25 +266,25 @@ size_t renderer_hit_test(Renderer *ren, TextBuffer *tb, int mouse_x, int mouse_y
 static void renderer_draw_selection(Renderer *ren, TextBuffer *tb) {
     if (!tb_has_selection(tb)) return;
 
-    size_t sel_start, sel_end;
+    int sel_start, sel_end;
     tb_get_selection_range(tb, &sel_start, &sel_end);
 
-    int line_num_width = 60;
+    int line_num_width = ren->text_area_left;
     int advance = ren->ft_face->size->metrics.max_advance >> 6;
 
-    size_t cur_line = 0;
+    int cur_line = 0;
     int x = line_num_width;
     int y = 0;
 
-    for (size_t i = 0; i < sel_end && i < tb->len; ) {
-        size_t line_start = tb_get_line_start(tb, i);
-        size_t line_end_pos = tb_get_line_end(tb, i);
+    for (int i = 0; i < sel_end && i < tb->len; ) {
+        int line_start = tb_get_line_start(tb, i);
+        int line_end_pos = tb_get_line_end(tb, i);
 
         if (line_end_pos > sel_start || line_start < sel_end) {
             int draw_y = y - tb->scroll_y;
             if (draw_y + ren->line_height >= 0 && draw_y < ren->buf_height) {
-                size_t eff_start = line_start > sel_start ? line_start : sel_start;
-                size_t eff_end = line_end_pos < sel_end ? line_end_pos : sel_end;
+                int eff_start = line_start > sel_start ? line_start : sel_start;
+                int eff_end = line_end_pos < sel_end ? line_end_pos : sel_end;
 
                 int sel_x1 = line_num_width + (int)(eff_start - line_start) * advance - tb->scroll_x;
                 int sel_x2 = line_num_width + (int)(eff_end - line_start) * advance - tb->scroll_x;
@@ -313,21 +317,21 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
     renderer_draw_line_numbers(ren, tb);
     renderer_draw_selection(ren, tb);
 
-    int line_num_width = 60;
+    int line_num_width = ren->text_area_left;
     int advance = ren->ft_face->size->metrics.max_advance >> 6;
 
-    size_t cur_line = 0;
+    int cur_line = 0;
     int x = line_num_width;
     int y = 0 - tb->scroll_y;
 
-    size_t sel_start = 0, sel_end = 0;
+    int sel_start = 0, sel_end = 0;
     int in_selection = 0;
     if (tb_has_selection(tb)) {
         tb_get_selection_range(tb, &sel_start, &sel_end);
         in_selection = 1;
     }
 
-    for (size_t i = 0; i <= tb->len; i++) {
+    for (int i = 0; i <= tb->len; i++) {
         if (i > 0 && tb->data[i - 1] == '\n') {
             cur_line++;
             x = line_num_width;
@@ -354,6 +358,7 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
                     if (in_selection && i >= sel_start && i < sel_end) {
                         ren->text_color = ren->selection_text_color;
                     }
+                    MyDebugOutput (L"Drawing char '%c' at line %zu, col %zu (x=%d, y=%d)\n", ch, cur_line, (x - line_num_width) / advance, draw_x, draw_y);
                     renderer_blend_glyph(ren, glyph, draw_x, draw_y);
                     ren->text_color = old_text;
                 }
@@ -370,3 +375,4 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
                       (BITMAPINFO *)&ren->bmi, DIB_RGB_COLORS);
     ReleaseDC(hwnd, hdc);
 }
+

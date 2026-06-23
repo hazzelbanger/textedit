@@ -9,11 +9,11 @@
 // TextBuffer is a dynamic text buffer that supports basic text editing operations, cursor movement, and selection. It maintains the text data, cursor position, selection state, and scroll offsets for rendering. The API provides functions for inserting and deleting characters, moving the cursor in various directions, managing text selection, and converting between line/column and character positions.
 typedef struct {
     char *data;
-    size_t len;
-    size_t cap;
+    int len;
+    int cap;
 
-    size_t cursor; // Current cursor position (character index)
-    size_t selection_anchor; // The position where the selection started
+    int cursor; // Current cursor position (character index)
+    int selection_anchor; // The position where the selection started
     int has_selection; // Whether there is an active selection
 
     int scroll_x; // Horizontal scroll offset in pixels
@@ -32,15 +32,15 @@ void tb_move_cursor_up(TextBuffer *tb);
 void tb_move_cursor_down(TextBuffer *tb);
 void tb_move_cursor_home(TextBuffer *tb);
 void tb_move_cursor_end(TextBuffer *tb);
-size_t tb_get_line_start(TextBuffer *tb, size_t pos);
-size_t tb_get_line_end(TextBuffer *tb, size_t pos);
-size_t tb_get_line_number(TextBuffer *tb, size_t pos);
-size_t tb_get_line_col(TextBuffer *tb, size_t pos);
+int tb_get_line_start(TextBuffer *tb, int pos);
+int tb_get_line_end(TextBuffer *tb, int pos);
+int tb_get_line_number(TextBuffer *tb, int pos);
+int tb_get_line_col(TextBuffer *tb, int pos);
 int tb_has_selection(TextBuffer *tb);
-void tb_get_selection_range(TextBuffer *tb, size_t *out_start, size_t *out_end);
+void tb_get_selection_range(TextBuffer *tb, int *out_start, int *out_end);
 void tb_delete_selection(TextBuffer *tb);
 void tb_clear_selection(TextBuffer *tb);
 void tb_select_all(TextBuffer *tb);
-size_t tb_pos_from_line_col(TextBuffer *tb, size_t line, size_t col);
+int tb_pos_from_line_col(TextBuffer *tb, int line, int col);
 
 #endif

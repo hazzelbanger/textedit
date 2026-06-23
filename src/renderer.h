@@ -42,6 +42,8 @@ typedef struct {
     COLORREF selection_text_color;
     COLORREF line_number_color;
     COLORREF line_number_bg;
+
+    int text_area_left;
 } Renderer;
 
 int renderer_init(Renderer *ren, const char *font_path, int font_size);
@@ -49,6 +51,6 @@ void renderer_free(Renderer *ren);
 void renderer_resize(Renderer *ren, int width, int height);
 void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd);
 void renderer_invalidate_glyph_cache(Renderer *ren);
-size_t renderer_hit_test(Renderer *ren, TextBuffer *tb, int mouse_x, int mouse_y);
+int renderer_hit_test(Renderer *ren, TextBuffer *tb, int mouse_x, int mouse_y);
 
 #endif
