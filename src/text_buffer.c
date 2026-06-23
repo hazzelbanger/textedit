@@ -34,7 +34,6 @@ static void tb_ensure_cap(TextBuffer *tb, int needed) {
 }
 
 void tb_debug_print(TextBuffer *tb) {
-    //MyDebugOutput(L"TextBuffer: len=%d, cap=%d, cursor=%d, selection_anchor=%d, has_selection=%d\n", tb->len, tb->cap, tb->cursor, tb->selection_anchor, tb->has_selection);
     MyDebugOutput(L"TB:%.*s\n", tb->len, tb->data);
 }
 
@@ -100,6 +99,10 @@ void tb_insert_char(TextBuffer *tb, char ch) {
     tb->data[tb->cursor] = ch;
     tb->cursor++;
     tb->len++;
+
+    int line = tb_get_line_number(tb, tb->cursor);
+    int col = tb_get_line_col(tb, tb->cursor);
+    MyDebugOutput(L"TB: Cursor is now at line %d, col %d\n", line, col);
 }
 
 void tb_insert_newline(TextBuffer *tb) {
@@ -146,7 +149,13 @@ void tb_move_cursor_up(TextBuffer *tb) {
     int prev_line_end = line_start - 1;
     int prev_line_start = tb_get_line_start(tb, prev_line_end);
     int prev_line_len = prev_line_end - prev_line_start;
-    tb->cursor = prev_line_start + (col < prev_line_len ? col : prev_line_len);
+    int new_col = (col < prev_line_len) ? col : prev_line_len;
+    tb->cursor = prev_line_start + new_col;
+    MyDebugOutput(L"TB: Moved cursor up to position %d (line start %d, prev line start %d, prev line end %d, col %d)\n", tb->cursor, line_start, prev_line_start, prev_line_end, new_col);
+
+    int line = tb_get_line_number(tb, tb->cursor);
+    new_col = tb_get_line_col(tb, tb->cursor);
+    MyDebugOutput(L"TB: Cursor is now at line %d, col %d\n", line, new_col);
 }
 
 void tb_move_cursor_down(TextBuffer *tb) {

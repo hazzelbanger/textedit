@@ -317,7 +317,6 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
     }
 
     MyDebugOutput(L"RR:Starting render: buf_width=%d, buf_height=%d\n", ren->buf_width, ren->buf_height);
-    tb_debug_print(tb);
 
     renderer_draw_line_numbers(ren, tb);
     renderer_draw_selection(ren, tb);
@@ -374,6 +373,8 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
         }
     }
 
+    renderer_draw_cursor(ren, tb);
+    
     HDC hdc = GetDC(hwnd);
     SetDIBitsToDevice(hdc, 0, 0, ren->buf_width, ren->buf_height,
                       0, 0, 0, ren->buf_height, ren->pixel_buf,
