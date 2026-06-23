@@ -33,6 +33,11 @@ static void tb_ensure_cap(TextBuffer *tb, int needed) {
     }
 }
 
+void tb_debug_print(TextBuffer *tb) {
+    //MyDebugOutput(L"TextBuffer: len=%d, cap=%d, cursor=%d, selection_anchor=%d, has_selection=%d\n", tb->len, tb->cap, tb->cursor, tb->selection_anchor, tb->has_selection);
+    MyDebugOutput(L"TB:%.*s\n", tb->len, tb->data);
+}
+
 int tb_has_selection(TextBuffer *tb) {
     return tb->has_selection && tb->selection_anchor != tb->cursor;
 }
@@ -88,7 +93,7 @@ int tb_pos_from_line_col(TextBuffer *tb, int line, int col) {
 }
 
 void tb_insert_char(TextBuffer *tb, char ch) {
-    MyDebugOutput(L"Inserting char '%c' at cursor position %d\n", ch, tb->cursor);
+    MyDebugOutput(L"TB: Inserting char '%x' at cursor position %d\n", ch, tb->cursor);
     if (tb_has_selection(tb)) tb_delete_selection(tb);
     tb_ensure_cap(tb, 2);
     memmove(tb->data + tb->cursor + 1, tb->data + tb->cursor, tb->len - tb->cursor + 1);

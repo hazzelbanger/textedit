@@ -42,5 +42,6 @@ void tb_delete_selection(TextBuffer *tb);
 void tb_clear_selection(TextBuffer *tb);
 void tb_select_all(TextBuffer *tb);
 int tb_pos_from_line_col(TextBuffer *tb, int line, int col);
+void tb_debug_print(TextBuffer *tb);
 
 #endif

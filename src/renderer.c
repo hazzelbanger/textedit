@@ -147,13 +147,13 @@ static void renderer_blend_glyph(Renderer *ren, GlyphInfo *glyph, int x, int y) 
     int surf_y = y - glyph->bearing_y + ren->ascender;
     int gw = glyph->width;
     int gh = glyph->height;
-    MyDebugOutput(L"Blending glyph at x=%d, y=%d (surf_x=%d, surf_y=%d, gw=%d, gh=%d)\n", x, y, surf_x, surf_y, gw, gh);
+    MyDebugOutput(L"BG: Blending glyph at x=%d, y=%d (surf_x=%d, surf_y=%d, gw=%d, gh=%d)\n", x, y, surf_x, surf_y, gw, gh);
     for (int gy = 0; gy < gh; gy++) {
         int py = surf_y + gy;
         if (py < 0 || py >= ren->buf_height) continue;
         for (int gx = 0; gx < gw; gx++) {
             int px = surf_x + gx;
-            if (px < ren->text_area_left || px >= ren->buf_width) continue;
+            if (px >= ren->buf_width) continue;
 
             unsigned char a = glyph->bitmap[gy * gw + gx];
             if (a == 0) continue;
@@ -213,6 +213,7 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
     }
 
     renderer_fill_rect(ren, 0, 0, line_num_width, ren->buf_height, ren->line_number_bg);
+    MyDebugOutput(L"DL: Total lines: %d, width: %d, height: %d, color: %x\n", total_lines, line_num_width, ren->buf_height, ren->line_number_bg);
 
     int cur_line = 0;
     int y = -tb->scroll_y;
@@ -226,6 +227,8 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
         // Calculate the x position to right-align the line number within the line number area. We take the width of the line number text and subtract it from the total line number area width, then add a small padding (10 pixels) to keep it away from the edge.
         int num_x = ren->text_area_left - 8 - (int)strlen(num_buf) * advance;
 
+        MyDebugOutput(L"DL: Drawing line number '%c' at line %d (x=%d, y=%d)\n", num_buf[0], line + 1, num_x, draw_y);
+
         // Save the current text color, set it to the line number color, draw the line number, and then restore the original text color. This ensures that the line numbers are drawn in a different color than the main text, improving readability.
         COLORREF old_text = ren->text_color;
         ren->text_color = ren->line_number_color;
@@ -233,7 +236,6 @@ static void renderer_draw_line_numbers(Renderer *ren, TextBuffer *tb) {
             GlyphInfo *glyph = renderer_get_glyph(ren, (unsigned long)num_buf[c]);
             if (glyph) {
                 renderer_blend_glyph(ren, glyph, num_x, draw_y);
-                MyDebugOutput(L"Drawing line number '%c' at x=%d, y=%d\n", num_buf[c], num_x, draw_y);
                 num_x += glyph->advance;
             }
         }
@@ -314,6 +316,9 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
         ren->pixel_buf[i + 3] = 255;
     }
 
+    MyDebugOutput(L"RR:Starting render: buf_width=%d, buf_height=%d\n", ren->buf_width, ren->buf_height);
+    tb_debug_print(tb);
+
     renderer_draw_line_numbers(ren, tb);
     renderer_draw_selection(ren, tb);
 
@@ -332,7 +337,7 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
     }
 
     for (int i = 0; i <= tb->len; i++) {
-        if (i > 0 && tb->data[i - 1] == '\n') {
+        if (i > 0 && tb->data[i] == '\n') {
             cur_line++;
             x = line_num_width;
             y += ren->line_height;
@@ -358,7 +363,7 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
                     if (in_selection && i >= sel_start && i < sel_end) {
                         ren->text_color = ren->selection_text_color;
                     }
-                    MyDebugOutput (L"Drawing char '%c' at line %zu, col %zu (x=%d, y=%d)\n", ch, cur_line, (x - line_num_width) / advance, draw_x, draw_y);
+                    MyDebugOutput (L"RR: Drawing char '%c' at line %zu, col %zu (x=%d, y=%d)\n", ch, cur_line, (x - line_num_width) / advance, draw_x, draw_y);
                     renderer_blend_glyph(ren, glyph, draw_x, draw_y);
                     ren->text_color = old_text;
                 }
