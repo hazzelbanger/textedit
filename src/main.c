@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "text_buffer.h"
 #include "renderer.h"
+#include "WinBase.h"
 
 #define WINDOW_CLASS_NAME L"TextEditorWndClass"
 #define WINDOW_TITLE L"TextEdit"
@@ -91,6 +92,40 @@ static void app_copy_selection(HWND hwnd) {
     CloseClipboard();
 }
 
+static void app_paste_selection(HWND hwnd) {
+    if (!IsClipboardFormatAvailable(CF_TEXT)) return;
+    OpenClipboard(hwnd);
+    HGLOBAL hmem = GetClipboardData(CF_TEXT);
+    if (!hmem) {
+        CloseClipboard();
+        return;
+    }
+    char *ptr = (char *)GlobalLock(hmem);
+    if (ptr) {
+        while (*ptr) {
+            tb_insert_char(&g_buffer, *ptr);
+            ptr++;
+        }
+    }
+    GlobalUnlock(hmem);
+    CloseClipboard();
+}
+
+static void app_delete_selection(void) {
+    if (!tb_has_selection(&g_buffer)) return;
+    int sel_start, sel_end;
+    tb_get_selection_range(&g_buffer, &sel_start, &sel_end);
+    memmove(g_buffer.data + sel_start, g_buffer.data + sel_end, g_buffer.len - sel_end + 1);
+    g_buffer.len -= (sel_end - sel_start);
+    g_buffer.cursor = sel_start;
+    tb_clear_selection(&g_buffer);
+}
+
+static void blink_cursor()
+{
+    g_renderer.cursor_color = g_cursor_blink ? RGB(0xFF, 0xFF, 0xFF) : RGB(0x80, 0x80, 0x80);
+}
+
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg) {
     case WM_CREATE:
@@ -136,11 +171,8 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     case WM_PAINT: {
         PAINTSTRUCT ps;
         BeginPaint(hwnd, &ps);
-        if (g_cursor_blink) {
-            renderer_render(&g_renderer, &g_buffer, hwnd);
-        } else {
-            renderer_render(&g_renderer, &g_buffer, hwnd);
-        }
+        blink_cursor();
+        renderer_render(&g_renderer, &g_buffer, hwnd);
         EndPaint(hwnd, &ps);
         return 0;
     }
@@ -218,7 +250,11 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
             tb_backspace(&g_buffer);
             goto handled;
         case VK_DELETE:
-            tb_delete(&g_buffer);
+            if (ctrl) 
+                app_delete_selection();
+            else 
+                tb_delete(&g_buffer);
+
             goto handled;
         case VK_RETURN:
             tb_insert_newline(&g_buffer);
@@ -231,6 +267,17 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         case 'C':
             if (ctrl) {
                 app_copy_selection(hwnd);
+            }
+            goto handled;
+        case 'V':
+            if (ctrl) {
+                app_paste_selection(hwnd);
+            }
+            goto handled;
+        case 'X':
+            if (ctrl) {
+                app_copy_selection(hwnd);
+                app_delete_selection();
             }
             goto handled;
         case 'S':
@@ -331,7 +378,8 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     }
 }
 
-int WINAPI WinMain(HINSTANCE h_inst, HINSTANCE h_prev_inst, LPSTR cmd_line, int show_cmd) {
+int WINAPI WinMain(HINSTANCE h_inst, HINSTANCE h_prev_inst, LPSTR cmd_line, int show_cmd)
+{
     (void)h_prev_inst;
     (void)cmd_line;
 

@@ -343,14 +343,6 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
             continue;
         }
 
-        if (i == tb->cursor && !in_selection) {
-            int cursor_x = x - tb->scroll_x;
-            int cursor_y = y - tb->scroll_y;
-            if (cursor_x >= line_num_width && cursor_y >= 0) {
-                renderer_fill_rect(ren, cursor_x, cursor_y, 2, ren->line_height, ren->cursor_color);
-            }
-        }
-
         if (i < tb->len) {
             unsigned long ch = (unsigned long)tb->data[i];
             GlyphInfo *glyph = renderer_get_glyph(ren, ch);
@@ -373,9 +365,11 @@ void renderer_render(Renderer *ren, TextBuffer *tb, HWND hwnd) {
         }
     }
 
-    renderer_draw_cursor(ren, tb);
-    
-    HDC hdc = GetDC(hwnd);
+    if (!in_selection) {
+        renderer_draw_cursor(ren, tb);
+    }
+
+      HDC hdc = GetDC(hwnd);
     SetDIBitsToDevice(hdc, 0, 0, ren->buf_width, ren->buf_height,
                       0, 0, 0, ren->buf_height, ren->pixel_buf,
                       (BITMAPINFO *)&ren->bmi, DIB_RGB_COLORS);
